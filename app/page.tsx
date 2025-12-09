@@ -12,11 +12,54 @@ const actionLabels: Record<ActionType, string> = {
 
 export default function Home() {
   const [url, setUrl] = useState("");
-  const [result, setResult] = useState<string>(
-    "Результат появится здесь после выбора действия."
-  );
+  const [result, setResult] = useState<string>("Результат появится здесь.");
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleParse = async () => {
+    if (!url.trim()) {
+      setError("Введите ссылку на статью на английском языке.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    setResult("Загрузка...");
+
+    try {
+      const response = await fetch("/api/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Не удалось разобрать страницу.");
+      }
+
+      const data = (await response.json()) as {
+        date: string | null;
+        title: string | null;
+        content: string | null;
+        error?: string;
+      };
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setResult(JSON.stringify(data, null, 2));
+    } catch (err) {
+      setResult("");
+      setError(
+        err instanceof Error ? err.message : "Произошла ошибка при разборе."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAction = (action: ActionType) => {
     if (!url.trim()) {
@@ -26,19 +69,6 @@ export default function Home() {
 
     setError(null);
     setActiveAction(action);
-
-    const examples: Record<ActionType, string> = {
-      about: "Краткое описание: AI расскажет, о чем статья.",
-      thesis:
-        "Тезисы: AI подготовит список ключевых пунктов и основных идей статьи.",
-      telegram:
-        "Пост для Telegram: AI создаст лаконичный пост с выводами и ссылкой.",
-    };
-
-    // Placeholder until backend/AI wiring is added.
-    setResult(
-      `URL: ${url}\n\n${examples[action]}\n\n(Интеграция с AI будет добавлена позже.)`
-    );
   };
 
   return (
@@ -77,8 +107,17 @@ export default function Home() {
           <button
             type="button"
             className="btn bg-sky-600 text-white hover:bg-sky-700 focus-visible:outline-sky-600"
+            onClick={handleParse}
+            disabled={loading}
+          >
+            Парсить статью
+          </button>
+          <button
+            type="button"
+            className="btn bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:outline-indigo-600"
             onClick={() => handleAction("about")}
             aria-pressed={activeAction === "about"}
+            disabled={loading}
           >
             {actionLabels.about}
           </button>
@@ -87,6 +126,7 @@ export default function Home() {
             className="btn bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:outline-emerald-600"
             onClick={() => handleAction("thesis")}
             aria-pressed={activeAction === "thesis"}
+            disabled={loading}
           >
             {actionLabels.thesis}
           </button>
@@ -95,6 +135,7 @@ export default function Home() {
             className="btn bg-rose-600 text-white hover:bg-rose-700 focus-visible:outline-rose-600"
             onClick={() => handleAction("telegram")}
             aria-pressed={activeAction === "telegram"}
+            disabled={loading}
           >
             {actionLabels.telegram}
           </button>
@@ -111,7 +152,7 @@ export default function Home() {
           )}
         </div>
         <div className="mt-4 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-slate-800">
-          {result}
+          {loading ? "Загрузка..." : result}
         </div>
       </section>
     </main>
