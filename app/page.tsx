@@ -155,6 +155,15 @@ export default function Home() {
           </button>
           <button
             type="button"
+            className="btn bg-orange-600 text-white hover:bg-orange-700 focus-visible:outline-orange-600"
+            onClick={() => handleAction("translate")}
+            aria-pressed={activeAction === "translate"}
+            disabled={loading}
+          >
+            {actionLabels.translate}
+          </button>
+          <button
+            type="button"
             className="btn bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:outline-indigo-600"
             onClick={() => handleAction("about")}
             aria-pressed={activeAction === "about"}
@@ -179,15 +188,6 @@ export default function Home() {
             disabled={loading}
           >
             {actionLabels.telegram}
-          </button>
-          <button
-            type="button"
-            className="btn bg-orange-600 text-white hover:bg-orange-700 focus-visible:outline-orange-600"
-            onClick={() => handleAction("translate")}
-            aria-pressed={activeAction === "translate"}
-            disabled={loading}
-          >
-            {actionLabels.translate}
           </button>
         </div>
       </section>
