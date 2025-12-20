@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 
-type ActionType = "about" | "thesis" | "telegram";
+type ActionType = "about" | "thesis" | "telegram" | "translate";
 
 const actionLabels: Record<ActionType, string> = {
   about: "О чем статья?",
   thesis: "Тезисы",
   telegram: "Пост для Telegram",
+  translate: "Перевод",
 };
 
 export default function Home() {
@@ -19,7 +20,7 @@ export default function Home() {
 
   const handleParse = async () => {
     if (!url.trim()) {
-      setError("Введите ссылку на статью на английском языке.");
+      setError("Введите ссылку на статью.");
       return;
     }
 
@@ -61,14 +62,54 @@ export default function Home() {
     }
   };
 
-  const handleAction = (action: ActionType) => {
+  const handleAction = async (action: ActionType) => {
     if (!url.trim()) {
-      setError("Введите ссылку на статью на английском языке.");
+      setError("Введите ссылку на статью.");
       return;
     }
 
     setError(null);
     setActiveAction(action);
+    setLoading(true);
+    setResult("Загрузка...");
+
+    // Handle translation action
+    if (action === "translate") {
+      try {
+        const response = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Не удалось перевести статью.");
+        }
+
+        const data = (await response.json()) as {
+          translation: string;
+          error?: string;
+        };
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        setResult(data.translation);
+      } catch (err) {
+        setResult("");
+        setError(
+          err instanceof Error ? err.message : "Произошла ошибка при переводе."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+    // For other actions, just set the active action (existing behavior)
+    else {
+      setLoading(false);
+    }
   };
 
   return (
@@ -81,15 +122,15 @@ export default function Home() {
           Подготовка контента из английских статей
         </h1>
         <p className="text-base text-slate-600">
-          Вставьте ссылку на статью и выберите нужное действие: описание, тезисы
-          или пост для Telegram.
+          Вставьте ссылку на статью и выберите нужное действие: описание, тезисы,
+          пост для Telegram или перевод на русский язык.
         </p>
       </header>
 
       <section className="card p-6 sm:p-8">
         <div className="flex flex-col gap-4">
           <label className="text-sm font-semibold text-slate-800" htmlFor="url">
-            Ссылка на статью (EN)
+            Ссылка на статью
           </label>
           <input
             id="url"
@@ -138,6 +179,15 @@ export default function Home() {
             disabled={loading}
           >
             {actionLabels.telegram}
+          </button>
+          <button
+            type="button"
+            className="btn bg-orange-600 text-white hover:bg-orange-700 focus-visible:outline-orange-600"
+            onClick={() => handleAction("translate")}
+            aria-pressed={activeAction === "translate"}
+            disabled={loading}
+          >
+            {actionLabels.translate}
           </button>
         </div>
       </section>
