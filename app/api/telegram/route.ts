@@ -23,20 +23,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Call OpenRouter AI for translation
-    const translatedText = await callOpenRouter(
-      "You are a professional translator. Translate the following article to Russian. Preserve the original formatting, structure, and meaning. Return only the translated text without any additional comments or explanations.",
-      "Translate this article to Russian:",
+    // Call OpenRouter AI for Telegram post generation
+    const post = await callOpenRouter(
+      "You are a social media content creator. Create an engaging Telegram post in Russian based on the following article. The post should be concise, informative, and suitable for Telegram format. Include relevant hashtags if appropriate. Return only the post content without additional comments.",
+      "Create a Telegram post in Russian based on this article:",
       parsed.content
     );
 
-    return NextResponse.json({ translation: translatedText });
+    // Append the original article URL at the end
+    const postWithLink = `${post}\n\n🔗 ${url}`;
+
+    return NextResponse.json({ post: postWithLink });
   } catch (error) {
-    console.error("Translation error", error);
+    console.error("Telegram post generation error", error);
     const errorMessage =
       error instanceof Error
         ? error.message
-        : "Unexpected error during translation";
+        : "Unexpected error during Telegram post generation";
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
