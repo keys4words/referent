@@ -69,7 +69,7 @@ export default function Home() {
       }
 
       const data = (await response.json()) as {
-        [key: string]: string;
+        [key: string]: string | undefined;
         error?: string;
       };
 
