@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 
-type ActionType = "about" | "thesis" | "telegram" | "translate";
+type ActionType = "about" | "thesis" | "telegram";
 
 const actionLabels: Record<ActionType, string> = {
   about: "О чем статья?",
   thesis: "Тезисы",
   telegram: "Пост для Telegram",
-  translate: "Перевод",
 };
 
 export default function Home() {
@@ -17,50 +16,6 @@ export default function Home() {
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const handleParse = async () => {
-    if (!url.trim()) {
-      setError("Введите ссылку на статью.");
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
-    setResult("Загрузка...");
-
-    try {
-      const response = await fetch("/api/parse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Не удалось разобрать страницу.");
-      }
-
-      const data = (await response.json()) as {
-        date: string | null;
-        title: string | null;
-        content: string | null;
-        error?: string;
-      };
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      setResult(JSON.stringify(data, null, 2));
-    } catch (err) {
-      setResult("");
-      setError(
-        err instanceof Error ? err.message : "Произошла ошибка при разборе."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAction = async (action: ActionType) => {
     if (!url.trim()) {
@@ -73,41 +28,69 @@ export default function Home() {
     setLoading(true);
     setResult("Загрузка...");
 
-    // Handle translation action
-    if (action === "translate") {
-      try {
-        const response = await fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
-        });
+    // Map actions to their API endpoints and response keys
+    const actionConfig: Record<
+      ActionType,
+      { endpoint: string; responseKey: string; errorMessage: string }
+    > = {
+      about: {
+        endpoint: "/api/about",
+        responseKey: "summary",
+        errorMessage: "Не удалось создать описание статьи.",
+      },
+      thesis: {
+        endpoint: "/api/thesis",
+        responseKey: "thesis",
+        errorMessage: "Не удалось извлечь тезисы.",
+      },
+      telegram: {
+        endpoint: "/api/telegram",
+        responseKey: "post",
+        errorMessage: "Не удалось создать пост для Telegram.",
+      },
+    };
 
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || "Не удалось перевести статью.");
-        }
-
-        const data = (await response.json()) as {
-          translation: string;
-          error?: string;
-        };
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        setResult(data.translation);
-      } catch (err) {
-        setResult("");
-        setError(
-          err instanceof Error ? err.message : "Произошла ошибка при переводе."
-        );
-      } finally {
-        setLoading(false);
-      }
+    const config = actionConfig[action];
+    if (!config) {
+      setLoading(false);
+      return;
     }
-    // For other actions, just set the active action (existing behavior)
-    else {
+
+    try {
+      const response = await fetch(config.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || config.errorMessage);
+      }
+
+      const data = (await response.json()) as {
+        [key: string]: string;
+        error?: string;
+      };
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const resultText = data[config.responseKey];
+      if (!resultText) {
+        throw new Error(config.errorMessage);
+      }
+
+      setResult(resultText);
+    } catch (err) {
+      setResult("");
+      setError(
+        err instanceof Error
+          ? err.message
+          : `Произошла ошибка при выполнении действия.`
+      );
+    } finally {
       setLoading(false);
     }
   };
@@ -122,8 +105,8 @@ export default function Home() {
           Подготовка контента из английских статей
         </h1>
         <p className="text-base text-slate-600">
-          Вставьте ссылку на статью и выберите нужное действие: описание, тезисы,
-          пост для Telegram или перевод на русский язык.
+          Вставьте ссылку на статью и выберите нужное действие: описание, тезисы
+          или пост для Telegram.
         </p>
       </header>
 
@@ -145,23 +128,6 @@ export default function Home() {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            className="btn bg-sky-600 text-white hover:bg-sky-700 focus-visible:outline-sky-600"
-            onClick={handleParse}
-            disabled={loading}
-          >
-            Парсить статью
-          </button>
-          <button
-            type="button"
-            className="btn bg-orange-600 text-white hover:bg-orange-700 focus-visible:outline-orange-600"
-            onClick={() => handleAction("translate")}
-            aria-pressed={activeAction === "translate"}
-            disabled={loading}
-          >
-            {actionLabels.translate}
-          </button>
           <button
             type="button"
             className="btn bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:outline-indigo-600"

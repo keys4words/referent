@@ -23,20 +23,20 @@ export async function POST(request: Request) {
       );
     }
 
-    // Call OpenRouter AI for translation
-    const translatedText = await callOpenRouter(
-      "You are a professional translator. Translate the following article to Russian. Preserve the original formatting, structure, and meaning. Return only the translated text without any additional comments or explanations.",
-      "Translate this article to Russian:",
+    // Call OpenRouter AI for summary
+    const summary = await callOpenRouter(
+      "You are a professional content analyst. Analyze the following article and provide a concise summary in Russian explaining what the article is about. Focus on the main topic, key points, and purpose. Return only the summary without additional comments.",
+      "What is this article about? Provide a summary in Russian:",
       parsed.content
     );
 
-    return NextResponse.json({ translation: translatedText });
+    return NextResponse.json({ summary });
   } catch (error) {
-    console.error("Translation error", error);
+    console.error("Summary error", error);
     const errorMessage =
       error instanceof Error
         ? error.message
-        : "Unexpected error during translation";
+        : "Unexpected error during summary generation";
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }
