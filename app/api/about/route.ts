@@ -15,7 +15,19 @@ export async function POST(request: Request) {
     }
 
     // Parse the article
-    const parsed = await parseArticle(url);
+    let parsed;
+    try {
+      parsed = await parseArticle(url);
+    } catch (error) {
+      if (error instanceof ArticleFetchError && error.statusCode === 403) {
+        return NextResponse.json(
+          { error: "PAYWALL_ERROR" },
+          { status: 403 }
+        );
+      }
+      throw error;
+    }
+    
     if (!parsed.content) {
       return NextResponse.json(
         { error: "Could not extract content from the article" },
@@ -25,8 +37,8 @@ export async function POST(request: Request) {
 
     // Call OpenRouter AI for summary
     const summary = await callOpenRouter(
-      "You are a professional content analyst. Analyze the following article and provide a concise summary in Russian explaining what the article is about. Focus on the main topic, key points, and purpose. Return only the summary without additional comments.",
-      "What is this article about? Provide a summary in Russian:",
+      "You are a professional content analyst. Analyze the following article (which may be in any language) and provide a concise summary in Russian explaining what the article is about. If the article is not in Russian, translate and analyze it. Focus on the main topic, key points, and purpose. Return only the summary in Russian without additional comments.",
+      "What is this article about? The article may be in any language. Provide a summary in Russian:",
       parsed.content
     );
 
@@ -45,6 +57,14 @@ export async function POST(request: Request) {
       error instanceof Error
         ? error.message
         : "Unexpected error during summary generation";
+    
+    // Check for token/credit limit errors
+    if (errorMessage === "TOKEN_LIMIT_ERROR") {
+      return NextResponse.json(
+        { error: "TOKEN_LIMIT_ERROR" },
+        { status: 402 }
+      );
+    }
     
     // Check if it's an OpenRouter API error
     if (errorMessage.includes("OPENROUTER_API_KEY") || errorMessage.includes("OpenRouter")) {

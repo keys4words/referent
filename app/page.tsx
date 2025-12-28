@@ -82,6 +82,12 @@ export default function Home() {
         if (data.error === "FETCH_ERROR") {
           setErrorType("FETCH_ERROR");
           setError("Не удалось загрузить статью по этой ссылке.");
+        } else if (data.error === "PAYWALL_ERROR") {
+          setErrorType("PAYWALL_ERROR");
+          setError("Статья недоступна: требуется подписка или вход в систему. Пожалуйста, используйте публично доступную статью.");
+        } else if (data.error === "TOKEN_LIMIT_ERROR") {
+          setErrorType("TOKEN_LIMIT_ERROR");
+          setError("Превышен лимит токенов API. Статья слишком длинная или недостаточно кредитов. Попробуйте более короткую статью или пополните баланс на https://openrouter.ai/settings/credits");
         } else if (data.error === "API_CONFIG_ERROR") {
           setErrorType("API_CONFIG_ERROR");
           setError("Ошибка конфигурации API. Проверьте настройки.");
@@ -177,11 +183,11 @@ export default function Home() {
           Referent AI Translator
         </p>
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900">
-          Подготовка контента из английских статей
+          Подготовка контента из статей
         </h1>
         <p className="text-sm sm:text-base text-slate-600 px-2">
-          Вставьте ссылку на статью и выберите нужное действие: описание, тезисы
-          или пост для Telegram.
+          Вставьте ссылку на статью на любом языке и выберите нужное действие: описание, тезисы
+          или пост для Telegram. Результат будет на русском языке.
         </p>
       </header>
 
@@ -199,7 +205,7 @@ export default function Home() {
             onChange={(e) => setUrl(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm sm:text-base text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
           />
-          <p className="text-xs text-slate-500">Укажите ссылку на англоязычную статью</p>
+          <p className="text-xs text-slate-500">Укажите ссылку на статью на любом языке</p>
           {error && (
             <Alert variant="destructive" className="mt-2">
               <AlertDescription className="text-sm break-words">{error}</AlertDescription>
