@@ -171,21 +171,21 @@ export default function Home() {
   };
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-10 px-6 py-12">
+    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 sm:gap-10 px-4 sm:px-6 py-6 sm:py-12">
       <header className="space-y-2 text-center">
-        <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        <p className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-slate-500">
           Referent AI Translator
         </p>
-        <h1 className="text-3xl font-bold text-slate-900 sm:text-4xl">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900">
           Подготовка контента из английских статей
         </h1>
-        <p className="text-base text-slate-600">
+        <p className="text-sm sm:text-base text-slate-600 px-2">
           Вставьте ссылку на статью и выберите нужное действие: описание, тезисы
           или пост для Telegram.
         </p>
       </header>
 
-      <section className="card p-6 sm:p-8">
+      <section className="card p-4 sm:p-6 md:p-8">
         <div className="flex flex-col gap-4">
           <label className="text-sm font-semibold text-slate-800" htmlFor="url">
             Ссылка на статью
@@ -197,20 +197,20 @@ export default function Home() {
             placeholder="Введите URL статьи, например: https://example.com/article"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm sm:text-base text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
           />
           <p className="text-xs text-slate-500">Укажите ссылку на англоязычную статью</p>
           {error && (
             <Alert variant="destructive" className="mt-2">
-              <AlertDescription className="text-sm">{error}</AlertDescription>
+              <AlertDescription className="text-sm break-words">{error}</AlertDescription>
             </Alert>
           )}
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
           <button
             type="button"
-            className="btn bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:outline-indigo-600"
+            className="btn bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:outline-indigo-600 w-full sm:w-auto"
             onClick={() => handleAction("about")}
             aria-pressed={activeAction === "about"}
             disabled={loading}
@@ -227,7 +227,7 @@ export default function Home() {
           </button>
           <button
             type="button"
-            className="btn bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:outline-emerald-600"
+            className="btn bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:outline-emerald-600 w-full sm:w-auto"
             onClick={() => handleAction("thesis")}
             aria-pressed={activeAction === "thesis"}
             disabled={loading}
@@ -244,7 +244,7 @@ export default function Home() {
           </button>
           <button
             type="button"
-            className="btn bg-rose-600 text-white hover:bg-rose-700 focus-visible:outline-rose-600"
+            className="btn bg-rose-600 text-white hover:bg-rose-700 focus-visible:outline-rose-600 w-full sm:w-auto"
             onClick={() => handleAction("telegram")}
             aria-pressed={activeAction === "telegram"}
             disabled={loading}
@@ -261,7 +261,7 @@ export default function Home() {
           </button>
           <button
             type="button"
-            className="btn bg-slate-500 text-white hover:bg-slate-600 focus-visible:outline-slate-500"
+            className="btn bg-slate-500 text-white hover:bg-slate-600 focus-visible:outline-slate-500 w-full sm:w-auto"
             onClick={handleClear}
             disabled={loading}
             title="Очистить все поля и результаты"
@@ -271,18 +271,18 @@ export default function Home() {
         </div>
       </section>
 
-      <section ref={resultsRef} className="card p-6 sm:p-8">
+      <section ref={resultsRef} className="card p-4 sm:p-6 md:p-8">
         {status && (
-          <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 flex items-center gap-3">
-            <Spinner size="sm" className="text-blue-600" />
-            <p className="text-sm text-blue-800">{status}</p>
+          <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
+            <Spinner size="sm" className="text-blue-600 flex-shrink-0" />
+            <p className="text-xs sm:text-sm text-blue-800 break-words">{status}</p>
           </div>
         )}
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold text-slate-900">Результат</h2>
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900">Результат</h2>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {activeAction && (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              <span className="rounded-full bg-slate-100 px-2 sm:px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 whitespace-nowrap">
                 {actionLabels[activeAction]}
               </span>
             )}
@@ -290,7 +290,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={handleCopy}
-                className="btn bg-slate-600 text-white hover:bg-slate-700 focus-visible:outline-slate-600 text-sm"
+                className="btn bg-slate-600 text-white hover:bg-slate-700 focus-visible:outline-slate-600 text-xs sm:text-sm"
                 title="Копировать результат"
               >
                 {copySuccess ? "Скопировано!" : "Копировать"}
@@ -298,7 +298,7 @@ export default function Home() {
             )}
           </div>
         </div>
-        <div className="mt-4 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-slate-800">
+        <div className="mt-4 whitespace-pre-line break-words overflow-wrap-anywhere rounded-xl border border-slate-200 bg-slate-50 px-3 sm:px-4 py-3 sm:py-4 text-sm sm:text-base text-slate-800" style={{ overflowWrap: 'anywhere' }}>
           {loading ? (
             <div className="flex items-center justify-center gap-3 py-8">
               <Spinner size="lg" className="text-slate-600" />
