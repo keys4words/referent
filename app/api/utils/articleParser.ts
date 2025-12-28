@@ -28,19 +28,54 @@ const extractContent = ($: cheerio.CheerioAPI): string | null => {
   return null;
 };
 
-export const parseArticle = async (url: string): Promise<ParseResult> => {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch page: ${res.status} ${res.statusText}`);
+export class ArticleFetchError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public isTimeout?: boolean
+  ) {
+    super(message);
+    this.name = "ArticleFetchError";
   }
+}
 
-  const html = await res.text();
-  const $ = cheerio.load(html);
+export const parseArticle = async (url: string): Promise<ParseResult> => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-  return {
-    date: null,
-    title: null,
-    content: extractContent($),
-  };
+    const res = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      throw new ArticleFetchError(
+        `Failed to fetch page: ${res.status} ${res.statusText}`,
+        res.status
+      );
+    }
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    return {
+      date: null,
+      title: null,
+      content: extractContent($),
+    };
+  } catch (error) {
+    if (error instanceof ArticleFetchError) {
+      throw error;
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ArticleFetchError("Request timeout", undefined, true);
+    }
+    throw new ArticleFetchError(
+      error instanceof Error ? error.message : "Failed to fetch article"
+    );
+  }
 };
 

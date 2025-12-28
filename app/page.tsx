@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type ActionType = "about" | "thesis" | "telegram";
 
@@ -16,6 +17,7 @@ export default function Home() {
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
   const handleAction = async (action: ActionType) => {
@@ -25,6 +27,7 @@ export default function Home() {
     }
 
     setError(null);
+    setErrorType(null);
     setActiveAction(action);
     setLoading(true);
     setStatus("Загружаю статью…");
@@ -66,8 +69,29 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || config.errorMessage);
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          statusCode?: number;
+          isTimeout?: boolean;
+        };
+        
+        // Handle different error types
+        if (data.error === "FETCH_ERROR") {
+          setErrorType("FETCH_ERROR");
+          setError("Не удалось загрузить статью по этой ссылке.");
+        } else if (data.error === "API_CONFIG_ERROR") {
+          setErrorType("API_CONFIG_ERROR");
+          setError("Ошибка конфигурации API. Проверьте настройки.");
+        } else if (data.error === "PROCESSING_ERROR") {
+          setErrorType("PROCESSING_ERROR");
+          setError(config.errorMessage);
+        } else {
+          setErrorType("UNKNOWN");
+          setError(config.errorMessage);
+        }
+        setResult("");
+        setStatus(null);
+        return;
       }
 
       const data = (await response.json()) as {
@@ -76,24 +100,38 @@ export default function Home() {
       };
 
       if (data.error) {
-        throw new Error(data.error);
+        setErrorType("PROCESSING_ERROR");
+        setError(config.errorMessage);
+        setResult("");
+        setStatus(null);
+        return;
       }
 
       const resultText = data[config.responseKey];
       if (!resultText) {
-        throw new Error(config.errorMessage);
+        setErrorType("PROCESSING_ERROR");
+        setError(config.errorMessage);
+        setResult("");
+        setStatus(null);
+        return;
       }
 
       setResult(resultText);
       setStatus(null);
+      setError(null);
+      setErrorType(null);
     } catch (err) {
       setResult("");
       setStatus(null);
-      setError(
-        err instanceof Error
-          ? err.message
-          : `Произошла ошибка при выполнении действия.`
-      );
+      
+      // Handle network errors, timeouts, etc.
+      if (err instanceof TypeError && err.message.includes("fetch")) {
+        setErrorType("FETCH_ERROR");
+        setError("Не удалось загрузить статью по этой ссылке.");
+      } else {
+        setErrorType("UNKNOWN");
+        setError("Произошла ошибка при выполнении действия.");
+      }
     } finally {
       setLoading(false);
     }
@@ -129,7 +167,11 @@ export default function Home() {
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
           />
           <p className="text-xs text-slate-500">Укажите ссылку на англоязычную статью</p>
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error && (
+            <Alert variant="destructive" className="mt-2">
+              <AlertDescription className="text-sm">{error}</AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">

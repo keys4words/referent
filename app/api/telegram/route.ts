@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { parseArticle } from "../utils/articleParser";
+import { parseArticle, ArticleFetchError } from "../utils/articleParser";
 import { callOpenRouter } from "../utils/openRouter";
 
 export async function POST(request: Request) {
@@ -36,12 +36,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ post: postWithLink });
   } catch (error) {
     console.error("Telegram post generation error", error);
+    
+    if (error instanceof ArticleFetchError) {
+      return NextResponse.json(
+        { error: "FETCH_ERROR", statusCode: error.statusCode, isTimeout: error.isTimeout },
+        { status: 502 }
+      );
+    }
+
     const errorMessage =
       error instanceof Error
         ? error.message
         : "Unexpected error during Telegram post generation";
+    
+    // Check if it's an OpenRouter API error
+    if (errorMessage.includes("OPENROUTER_API_KEY") || errorMessage.includes("OpenRouter")) {
+      return NextResponse.json(
+        { error: "API_CONFIG_ERROR" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
-      { error: errorMessage },
+      { error: "PROCESSING_ERROR" },
       { status: 500 }
     );
   }
