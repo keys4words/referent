@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { parseArticle } from "../utils/articleParser";
+import { parseArticle, ArticleFetchError } from "../utils/articleParser";
 import { callOpenRouter } from "../utils/openRouter";
 
 export async function POST(request: Request) {
@@ -15,7 +15,19 @@ export async function POST(request: Request) {
     }
 
     // Parse the article
-    const parsed = await parseArticle(url);
+    let parsed;
+    try {
+      parsed = await parseArticle(url);
+    } catch (error) {
+      if (error instanceof ArticleFetchError && error.statusCode === 403) {
+        return NextResponse.json(
+          { error: "PAYWALL_ERROR" },
+          { status: 403 }
+        );
+      }
+      throw error;
+    }
+    
     if (!parsed.content) {
       return NextResponse.json(
         { error: "Could not extract content from the article" },
@@ -25,20 +37,45 @@ export async function POST(request: Request) {
 
     // Call OpenRouter AI for thesis extraction
     const thesis = await callOpenRouter(
-      "You are a professional content analyst. Analyze the following article and extract the main thesis statements and key points in Russian. Present them as a structured list of concise bullet points. Return only the thesis points without additional comments.",
-      "Extract the main thesis and key points from this article in Russian:",
+      "You are a professional content analyst. Analyze the following article (which may be in any language) and extract the main thesis statements and key points in Russian. If the article is not in Russian, translate and analyze it. Present them as a structured list of concise bullet points. Return only the thesis points in Russian without additional comments.",
+      "Extract the main thesis and key points from this article. The article may be in any language. Provide the result in Russian:",
       parsed.content
     );
 
     return NextResponse.json({ thesis });
   } catch (error) {
     console.error("Thesis extraction error", error);
+    
+    if (error instanceof ArticleFetchError) {
+      return NextResponse.json(
+        { error: "FETCH_ERROR", statusCode: error.statusCode, isTimeout: error.isTimeout },
+        { status: 502 }
+      );
+    }
+
     const errorMessage =
       error instanceof Error
         ? error.message
         : "Unexpected error during thesis extraction";
+    
+    // Check for token/credit limit errors
+    if (errorMessage === "TOKEN_LIMIT_ERROR") {
+      return NextResponse.json(
+        { error: "TOKEN_LIMIT_ERROR" },
+        { status: 402 }
+      );
+    }
+    
+    // Check if it's an OpenRouter API error
+    if (errorMessage.includes("OPENROUTER_API_KEY") || errorMessage.includes("OpenRouter")) {
+      return NextResponse.json(
+        { error: "API_CONFIG_ERROR" },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
-      { error: errorMessage },
+      { error: "PROCESSING_ERROR" },
       { status: 500 }
     );
   }

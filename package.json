@@ -10,9 +10,10 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0",
+    "class-variance-authority": "^0.7.1",
+    "next": "^14.2.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "next": "^14.2.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -24,4 +25,3 @@
     "typescript": "^5.5.0"
   }
 }
-
