@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
 
 type ActionType = "about" | "thesis" | "telegram";
 
@@ -19,6 +20,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const handleAction = async (action: ActionType) => {
     if (!url.trim()) {
@@ -120,6 +123,11 @@ export default function Home() {
       setStatus(null);
       setError(null);
       setErrorType(null);
+      
+      // Scroll to results after successful generation
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
     } catch (err) {
       setResult("");
       setStatus(null);
@@ -134,6 +142,31 @@ export default function Home() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClear = () => {
+    setUrl("");
+    setResult("Результат появится здесь.");
+    setActiveAction(null);
+    setLoading(false);
+    setError(null);
+    setErrorType(null);
+    setStatus(null);
+    setCopySuccess(false);
+  };
+
+  const handleCopy = async () => {
+    if (!result || result === "Результат появится здесь." || result === "Загрузка...") {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(result);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
     }
   };
 
@@ -183,7 +216,14 @@ export default function Home() {
             disabled={loading}
             title="Получить краткое описание статьи на русском языке"
           >
-            {actionLabels.about}
+            {loading && activeAction === "about" ? (
+              <>
+                <Spinner size="sm" className="mr-2 text-white" />
+                {actionLabels.about}
+              </>
+            ) : (
+              actionLabels.about
+            )}
           </button>
           <button
             type="button"
@@ -193,7 +233,14 @@ export default function Home() {
             disabled={loading}
             title="Извлечь основные тезисы и ключевые моменты статьи на русском языке"
           >
-            {actionLabels.thesis}
+            {loading && activeAction === "thesis" ? (
+              <>
+                <Spinner size="sm" className="mr-2 text-white" />
+                {actionLabels.thesis}
+              </>
+            ) : (
+              actionLabels.thesis
+            )}
           </button>
           <button
             type="button"
@@ -203,27 +250,63 @@ export default function Home() {
             disabled={loading}
             title="Создать пост для Telegram на основе статьи на русском языке"
           >
-            {actionLabels.telegram}
+            {loading && activeAction === "telegram" ? (
+              <>
+                <Spinner size="sm" className="mr-2 text-white" />
+                {actionLabels.telegram}
+              </>
+            ) : (
+              actionLabels.telegram
+            )}
+          </button>
+          <button
+            type="button"
+            className="btn bg-slate-500 text-white hover:bg-slate-600 focus-visible:outline-slate-500"
+            onClick={handleClear}
+            disabled={loading}
+            title="Очистить все поля и результаты"
+          >
+            Очистить
           </button>
         </div>
       </section>
 
-      <section className="card p-6 sm:p-8">
+      <section ref={resultsRef} className="card p-6 sm:p-8">
         {status && (
-          <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">
+          <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 flex items-center gap-3">
+            <Spinner size="sm" className="text-blue-600" />
             <p className="text-sm text-blue-800">{status}</p>
           </div>
         )}
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-slate-900">Результат</h2>
-          {activeAction && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-              {actionLabels[activeAction]}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {activeAction && (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                {actionLabels[activeAction]}
+              </span>
+            )}
+            {result && result !== "Результат появится здесь." && result !== "Загрузка..." && (
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="btn bg-slate-600 text-white hover:bg-slate-700 focus-visible:outline-slate-600 text-sm"
+                title="Копировать результат"
+              >
+                {copySuccess ? "Скопировано!" : "Копировать"}
+              </button>
+            )}
+          </div>
         </div>
         <div className="mt-4 whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-slate-800">
-          {loading ? "Загрузка..." : result}
+          {loading ? (
+            <div className="flex items-center justify-center gap-3 py-8">
+              <Spinner size="lg" className="text-slate-600" />
+              <span className="text-slate-600">Загрузка...</span>
+            </div>
+          ) : (
+            result
+          )}
         </div>
       </section>
     </main>
