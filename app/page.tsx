@@ -16,6 +16,7 @@ export default function Home() {
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   const handleAction = async (action: ActionType) => {
     if (!url.trim()) {
@@ -26,6 +27,7 @@ export default function Home() {
     setError(null);
     setActiveAction(action);
     setLoading(true);
+    setStatus("Загружаю статью…");
     setResult("Загрузка...");
 
     // Map actions to their API endpoints and response keys
@@ -83,8 +85,10 @@ export default function Home() {
       }
 
       setResult(resultText);
+      setStatus(null);
     } catch (err) {
       setResult("");
+      setStatus(null);
       setError(
         err instanceof Error
           ? err.message
@@ -119,11 +123,12 @@ export default function Home() {
             id="url"
             type="url"
             inputMode="url"
-            placeholder="https://example.com/article"
+            placeholder="Введите URL статьи, например: https://example.com/article"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
           />
+          <p className="text-xs text-slate-500">Укажите ссылку на англоязычную статью</p>
           {error && <p className="text-sm text-rose-600">{error}</p>}
         </div>
 
@@ -134,6 +139,7 @@ export default function Home() {
             onClick={() => handleAction("about")}
             aria-pressed={activeAction === "about"}
             disabled={loading}
+            title="Получить краткое описание статьи на русском языке"
           >
             {actionLabels.about}
           </button>
@@ -143,6 +149,7 @@ export default function Home() {
             onClick={() => handleAction("thesis")}
             aria-pressed={activeAction === "thesis"}
             disabled={loading}
+            title="Извлечь основные тезисы и ключевые моменты статьи на русском языке"
           >
             {actionLabels.thesis}
           </button>
@@ -152,6 +159,7 @@ export default function Home() {
             onClick={() => handleAction("telegram")}
             aria-pressed={activeAction === "telegram"}
             disabled={loading}
+            title="Создать пост для Telegram на основе статьи на русском языке"
           >
             {actionLabels.telegram}
           </button>
@@ -159,6 +167,11 @@ export default function Home() {
       </section>
 
       <section className="card p-6 sm:p-8">
+        {status && (
+          <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3">
+            <p className="text-sm text-blue-800">{status}</p>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-slate-900">Результат</h2>
           {activeAction && (
