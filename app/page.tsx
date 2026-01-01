@@ -4,17 +4,19 @@ import { useState, useRef, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 
-type ActionType = "about" | "thesis" | "telegram";
+type ActionType = "about" | "thesis" | "telegram" | "illustration";
 
 const actionLabels: Record<ActionType, string> = {
   about: "О чем статья?",
   thesis: "Тезисы",
   telegram: "Пост для Telegram",
+  illustration: "Иллюстрация",
 };
 
 export default function Home() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<string>("Результат появится здесь.");
+  const [resultImage, setResultImage] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,11 @@ export default function Home() {
     setErrorType(null);
     setActiveAction(action);
     setLoading(true);
-    setStatus("Загружаю статью…");
+    if (action === "illustration") {
+      setStatus("Загружаю статью и создаю иллюстрацию…");
+    } else {
+      setStatus("Загружаю статью…");
+    }
     setResult("Загрузка...");
 
     // Map actions to their API endpoints and response keys
@@ -55,6 +61,11 @@ export default function Home() {
         endpoint: "/api/telegram",
         responseKey: "post",
         errorMessage: "Не удалось создать пост для Telegram.",
+      },
+      illustration: {
+        endpoint: "/api/illustration",
+        responseKey: "illustration",
+        errorMessage: "Не удалось создать иллюстрацию.",
       },
     };
 
@@ -116,19 +127,48 @@ export default function Home() {
         return;
       }
 
-      const resultText = data[config.responseKey];
-      if (!resultText) {
-        setErrorType("PROCESSING_ERROR");
-        setError(config.errorMessage);
-        setResult("");
-        setStatus(null);
-        return;
-      }
+      // Handle illustration (image) differently
+      if (action === "illustration") {
+        const imageUrl = data.illustration;
+        const prompt = data.prompt;
+        
+        if (!imageUrl) {
+          setErrorType("PROCESSING_ERROR");
+          setError(config.errorMessage);
+          setResult("");
+          setResultImage(null);
+          setStatus(null);
+          return;
+        }
 
-      setResult(resultText);
-      setStatus(null);
-      setError(null);
-      setErrorType(null);
+        setResultImage(imageUrl);
+        setResult(""); // Hide prompt, show only image
+        setStatus(null);
+        setError(null);
+        setErrorType(null);
+      } else {
+        const resultText = data[config.responseKey];
+        if (!resultText) {
+          setErrorType("PROCESSING_ERROR");
+          setError(config.errorMessage);
+          setResult("");
+          setResultImage(null);
+          setStatus(null);
+          return;
+        }
+
+        // For Telegram post, check if there's an illustration
+        if (action === "telegram" && data.illustration) {
+          setResultImage(data.illustration);
+        } else {
+          setResultImage(null);
+        }
+
+        setResult(resultText);
+        setStatus(null);
+        setError(null);
+        setErrorType(null);
+      }
       
       // Scroll to results after successful generation
       setTimeout(() => {
@@ -136,6 +176,7 @@ export default function Home() {
       }, 100);
     } catch (err) {
       setResult("");
+      setResultImage(null);
       setStatus(null);
       
       // Handle network errors, timeouts, etc.
@@ -154,6 +195,7 @@ export default function Home() {
   const handleClear = () => {
     setUrl("");
     setResult("Результат появится здесь.");
+    setResultImage(null);
     setActiveAction(null);
     setLoading(false);
     setError(null);
@@ -186,8 +228,8 @@ export default function Home() {
           Подготовка контента из статей
         </h1>
         <p className="text-sm sm:text-base text-slate-600 px-2">
-          Вставьте ссылку на статью на любом языке и выберите нужное действие: описание, тезисы
-          или пост для Telegram. Результат будет на русском языке.
+          Вставьте ссылку на статью на любом языке и выберите нужное действие: описание, тезисы,
+          пост для Telegram или иллюстрация. Результат будет на русском языке.
         </p>
       </header>
 
@@ -267,6 +309,23 @@ export default function Home() {
           </button>
           <button
             type="button"
+            className="btn bg-purple-600 text-white hover:bg-purple-700 focus-visible:outline-purple-600 w-full sm:w-auto"
+            onClick={() => handleAction("illustration")}
+            aria-pressed={activeAction === "illustration"}
+            disabled={loading}
+            title="Создать иллюстрацию на основе статьи"
+          >
+            {loading && activeAction === "illustration" ? (
+              <>
+                <Spinner size="sm" className="mr-2 text-white" />
+                {actionLabels.illustration}
+              </>
+            ) : (
+              actionLabels.illustration
+            )}
+          </button>
+          <button
+            type="button"
             className="btn bg-slate-500 text-white hover:bg-slate-600 focus-visible:outline-slate-500 w-full sm:w-auto"
             onClick={handleClear}
             disabled={loading}
@@ -311,7 +370,18 @@ export default function Home() {
               <span className="text-slate-600">Загрузка...</span>
             </div>
           ) : (
-            result
+            <>
+              {resultImage && (
+                <div className="mb-4">
+                  <img
+                    src={resultImage}
+                    alt="Сгенерированная иллюстрация"
+                    className="w-full max-w-2xl mx-auto rounded-lg shadow-lg"
+                  />
+                </div>
+              )}
+              {result}
+            </>
           )}
         </div>
       </section>
