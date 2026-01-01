@@ -6,31 +6,38 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const url = typeof body?.url === "string" ? body.url.trim() : "";
+    const textContent = typeof body?.text === "string" ? body.text.trim() : "";
 
-    if (!url) {
-      return NextResponse.json(
-        { error: "URL is required in body: { url: string }" },
-        { status: 400 }
-      );
-    }
+    let articleContent: string;
 
-    // Parse the article
-    let parsed;
-    try {
-      parsed = await parseArticle(url);
-    } catch (error) {
-      if (error instanceof ArticleFetchError && error.statusCode === 403) {
+    // Support both URL and direct text input
+    if (textContent) {
+      articleContent = textContent;
+    } else if (url) {
+      // Parse the article
+      let parsed;
+      try {
+        parsed = await parseArticle(url);
+      } catch (error) {
+        if (error instanceof ArticleFetchError && error.statusCode === 403) {
+          return NextResponse.json(
+            { error: "PAYWALL_ERROR" },
+            { status: 403 }
+          );
+        }
+        throw error;
+      }
+      
+      if (!parsed.content) {
         return NextResponse.json(
-          { error: "PAYWALL_ERROR" },
-          { status: 403 }
+          { error: "Could not extract content from the article" },
+          { status: 400 }
         );
       }
-      throw error;
-    }
-    
-    if (!parsed.content) {
+      articleContent = parsed.content;
+    } else {
       return NextResponse.json(
-        { error: "Could not extract content from the article" },
+        { error: "URL or text content is required in body: { url?: string, text?: string }" },
         { status: 400 }
       );
     }
@@ -39,7 +46,7 @@ export async function POST(request: Request) {
     const thesis = await callOpenRouter(
       "You are a professional content analyst. Analyze the following article (which may be in any language) and extract the main thesis statements and key points in Russian. If the article is not in Russian, translate and analyze it. Present them as a structured list of concise bullet points. Return only the thesis points in Russian without additional comments.",
       "Extract the main thesis and key points from this article. The article may be in any language. Provide the result in Russian:",
-      parsed.content
+      articleContent
     );
 
     return NextResponse.json({ thesis });
