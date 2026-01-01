@@ -6,31 +6,38 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const url = typeof body?.url === "string" ? body.url.trim() : "";
+    const textContent = typeof body?.text === "string" ? body.text.trim() : "";
 
-    if (!url) {
-      return NextResponse.json(
-        { error: "URL is required in body: { url: string }" },
-        { status: 400 }
-      );
-    }
+    let articleContent: string;
 
-    // Parse the article
-    let parsed;
-    try {
-      parsed = await parseArticle(url);
-    } catch (error) {
-      if (error instanceof ArticleFetchError && error.statusCode === 403) {
+    // Support both URL and direct text input
+    if (textContent) {
+      articleContent = textContent;
+    } else if (url) {
+      // Parse the article
+      let parsed;
+      try {
+        parsed = await parseArticle(url);
+      } catch (error) {
+        if (error instanceof ArticleFetchError && error.statusCode === 403) {
+          return NextResponse.json(
+            { error: "PAYWALL_ERROR" },
+            { status: 403 }
+          );
+        }
+        throw error;
+      }
+      
+      if (!parsed.content) {
         return NextResponse.json(
-          { error: "PAYWALL_ERROR" },
-          { status: 403 }
+          { error: "Could not extract content from the article" },
+          { status: 400 }
         );
       }
-      throw error;
-    }
-    
-    if (!parsed.content) {
+      articleContent = parsed.content;
+    } else {
       return NextResponse.json(
-        { error: "Could not extract content from the article" },
+        { error: "URL or text content is required in body: { url?: string, text?: string }" },
         { status: 400 }
       );
     }
@@ -39,7 +46,7 @@ export async function POST(request: Request) {
     const imagePrompt = await callOpenRouter(
       "You are a professional image prompt generator. Based on the following article, create a detailed, vivid image generation prompt in English. The prompt should describe a scene, concept, or visual representation that captures the essence of the article. Focus on visual elements, style, mood, and composition. Return only the prompt text without additional comments or explanations.",
       "Create a detailed image generation prompt in English based on this article:",
-      parsed.content,
+      articleContent,
       500 // Shorter prompt generation
     );
 

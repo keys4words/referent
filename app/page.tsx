@@ -13,8 +13,21 @@ const actionLabels: Record<ActionType, string> = {
   illustration: "Иллюстрация",
 };
 
+type HistoryItem = {
+  id: string;
+  timestamp: number;
+  action: ActionType;
+  url: string;
+  result: string;
+  image?: string | null;
+};
+
+type InputMode = "url" | "text";
+
 export default function Home() {
+  const [inputMode, setInputMode] = useState<InputMode>("url");
   const [url, setUrl] = useState("");
+  const [textInput, setTextInput] = useState("");
   const [result, setResult] = useState<string>("Результат появится здесь.");
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
@@ -23,11 +36,117 @@ export default function Home() {
   const [errorType, setErrorType] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  // Load history from localStorage on mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("referent_history");
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error("Failed to load history:", e);
+      }
+    }
+  }, []);
+
+  // Save to history
+  const saveToHistory = (action: ActionType, input: string, result: string, image: string | null) => {
+    const newItem: HistoryItem = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      action,
+      url: inputMode === "url" ? input : "Текст",
+      result,
+      image,
+    };
+    const updatedHistory = [newItem, ...history].slice(0, 50); // Keep last 50 items
+    setHistory(updatedHistory);
+    localStorage.setItem("referent_history", JSON.stringify(updatedHistory));
+  };
+
+  // Load from history
+  const loadFromHistory = (item: HistoryItem) => {
+    setResult(item.result);
+    setResultImage(item.image || null);
+    setActiveAction(item.action);
+    if (item.url !== "Текст") {
+      setUrl(item.url);
+      setInputMode("url");
+    } else {
+      setTextInput(item.result);
+      setInputMode("text");
+    }
+    setShowHistory(false);
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  // Export functions
+  const handleExportTxt = () => {
+    if (!result || result === "Результат появится здесь." || result === "Загрузка...") {
+      return;
+    }
+    const content = `${actionLabels[activeAction || "about"]}\n\n${result}`;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `result-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = async () => {
+    if (!result || result === "Результат появится здесь." || result === "Загрузка...") {
+      return;
+    }
+    // Simple PDF generation using browser print
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${actionLabels[activeAction || "about"]}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              h1 { color: #333; }
+              pre { white-space: pre-wrap; word-wrap: break-word; }
+              img { max-width: 100%; height: auto; }
+            </style>
+          </head>
+          <body>
+            <h1>${actionLabels[activeAction || "about"]}</h1>
+            ${resultImage ? `<img src="${resultImage}" alt="Иллюстрация" />` : ""}
+            <pre>${result}</pre>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
+  // Download image
+  const handleDownloadImage = () => {
+    if (!resultImage) return;
+    const link = document.createElement("a");
+    link.href = resultImage;
+    link.download = `illustration-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleAction = async (action: ActionType) => {
-    if (!url.trim()) {
-      setError("Введите ссылку на статью.");
+    const input = inputMode === "url" ? url.trim() : textInput.trim();
+    if (!input) {
+      setError(inputMode === "url" ? "Введите ссылку на статью." : "Введите текст статьи.");
       return;
     }
 
@@ -36,9 +155,9 @@ export default function Home() {
     setActiveAction(action);
     setLoading(true);
     if (action === "illustration") {
-      setStatus("Загружаю статью и создаю иллюстрацию…");
+      setStatus(inputMode === "url" ? "Загружаю статью и создаю иллюстрацию…" : "Создаю иллюстрацию…");
     } else {
-      setStatus("Загружаю статью…");
+      setStatus(inputMode === "url" ? "Загружаю статью…" : "Обрабатываю текст…");
     }
     setResult("Загрузка...");
 
@@ -76,10 +195,14 @@ export default function Home() {
     }
 
     try {
+      const requestBody = inputMode === "url" 
+        ? { url: input }
+        : { text: input };
+      
       const response = await fetch(config.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -146,6 +269,8 @@ export default function Home() {
         setStatus(null);
         setError(null);
         setErrorType(null);
+        // Save to history
+        saveToHistory(action, input, "", imageUrl);
       } else {
         const resultText = data[config.responseKey];
         if (!resultText) {
@@ -158,8 +283,10 @@ export default function Home() {
         }
 
         // For Telegram post, check if there's an illustration
+        let finalImage: string | null = null;
         if (action === "telegram" && data.illustration) {
-          setResultImage(data.illustration);
+          finalImage = data.illustration;
+          setResultImage(finalImage);
         } else {
           setResultImage(null);
         }
@@ -168,6 +295,8 @@ export default function Home() {
         setStatus(null);
         setError(null);
         setErrorType(null);
+        // Save to history
+        saveToHistory(action, input, resultText, finalImage);
       }
       
       // Scroll to results after successful generation
@@ -194,6 +323,7 @@ export default function Home() {
 
   const handleClear = () => {
     setUrl("");
+    setTextInput("");
     setResult("Результат появится здесь.");
     setResultImage(null);
     setActiveAction(null);
@@ -202,6 +332,7 @@ export default function Home() {
     setErrorType(null);
     setStatus(null);
     setCopySuccess(false);
+    setShowHistory(false);
   };
 
   const handleCopy = async () => {
@@ -228,26 +359,68 @@ export default function Home() {
           Подготовка контента из статей
         </h1>
         <p className="text-sm sm:text-base text-slate-600 px-2">
-          Вставьте ссылку на статью на любом языке и выберите нужное действие: описание, тезисы,
+          Вставьте ссылку на статью или текст на любом языке и выберите нужное действие: описание, тезисы,
           пост для Telegram или иллюстрация. Результат будет на русском языке.
         </p>
       </header>
 
       <section className="card p-4 sm:p-6 md:p-8">
         <div className="flex flex-col gap-4">
-          <label className="text-sm font-semibold text-slate-800" htmlFor="url">
-            Ссылка на статью
-          </label>
-          <input
-            id="url"
-            type="url"
-            inputMode="url"
-            placeholder="Введите URL статьи, например: https://example.com/article"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm sm:text-base text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
-          />
-          <p className="text-xs text-slate-500">Укажите ссылку на статью на любом языке</p>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-slate-800">
+              {inputMode === "url" ? "Ссылка на статью" : "Текст статьи"}
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setInputMode("url")}
+                className={`px-3 py-1 text-xs rounded-lg transition ${
+                  inputMode === "url"
+                    ? "bg-sky-100 text-sky-700 font-semibold"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                URL
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMode("text")}
+                className={`px-3 py-1 text-xs rounded-lg transition ${
+                  inputMode === "text"
+                    ? "bg-sky-100 text-sky-700 font-semibold"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                Текст
+              </button>
+            </div>
+          </div>
+          {inputMode === "url" ? (
+            <>
+              <input
+                id="url"
+                type="url"
+                inputMode="url"
+                placeholder="Введите URL статьи, например: https://example.com/article"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm sm:text-base text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
+              />
+              <p className="text-xs text-slate-500">Укажите ссылку на статью на любом языке</p>
+            </>
+          ) : (
+            <>
+              <textarea
+                id="text"
+                rows={8}
+                placeholder="Вставьте текст статьи на любом языке..."
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm sm:text-base text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-200 resize-y"
+              />
+              <p className="text-xs text-slate-500">Вставьте текст статьи на любом языке</p>
+            </>
+          )}
           {error && (
             <Alert variant="destructive" className="mt-2">
               <AlertDescription className="text-sm break-words">{error}</AlertDescription>
@@ -344,25 +517,85 @@ export default function Home() {
           </div>
         )}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h2 className="text-lg sm:text-xl font-semibold text-slate-900">Результат</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg sm:text-xl font-semibold text-slate-900">Результат</h2>
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className="text-xs text-slate-600 hover:text-slate-900 underline"
+              title="Показать историю"
+            >
+              История ({history.length})
+            </button>
+          </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {activeAction && (
               <span className="rounded-full bg-slate-100 px-2 sm:px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 whitespace-nowrap">
                 {actionLabels[activeAction]}
               </span>
             )}
-            {result && result !== "Результат появится здесь." && result !== "Загрузка..." && (
+            {resultImage && (
               <button
                 type="button"
-                onClick={handleCopy}
-                className="btn bg-slate-600 text-white hover:bg-slate-700 focus-visible:outline-slate-600 text-xs sm:text-sm"
-                title="Копировать результат"
+                onClick={handleDownloadImage}
+                className="btn bg-purple-600 text-white hover:bg-purple-700 focus-visible:outline-purple-600 text-xs sm:text-sm"
+                title="Скачать изображение"
               >
-                {copySuccess ? "Скопировано!" : "Копировать"}
+                📥 Скачать
               </button>
+            )}
+            {result && result !== "Результат появится здесь." && result !== "Загрузка..." && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleExportTxt}
+                  className="btn bg-slate-600 text-white hover:bg-slate-700 focus-visible:outline-slate-600 text-xs sm:text-sm"
+                  title="Экспортировать в TXT"
+                >
+                  📄 TXT
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  className="btn bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-600 text-xs sm:text-sm"
+                  title="Экспортировать в PDF"
+                >
+                  📑 PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="btn bg-slate-600 text-white hover:bg-slate-700 focus-visible:outline-slate-600 text-xs sm:text-sm"
+                  title="Копировать результат"
+                >
+                  {copySuccess ? "Скопировано!" : "Копировать"}
+                </button>
+              </>
             )}
           </div>
         </div>
+        {showHistory && history.length > 0 && (
+          <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 max-h-64 overflow-y-auto">
+            <h3 className="text-sm font-semibold text-slate-800 mb-3">История результатов</h3>
+            <div className="space-y-2">
+              {history.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => loadFromHistory(item)}
+                  className="w-full text-left p-3 rounded-lg bg-white border border-slate-200 hover:border-sky-400 hover:bg-sky-50 transition text-xs sm:text-sm"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-slate-900">{actionLabels[item.action]}</span>
+                    <span className="text-slate-500">
+                      {new Date(item.timestamp).toLocaleString("ru-RU")}
+                    </span>
+                  </div>
+                  <div className="text-slate-600 truncate">{item.url}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mt-4 whitespace-pre-line break-words overflow-wrap-anywhere rounded-xl border border-slate-200 bg-slate-50 px-3 sm:px-4 py-3 sm:py-4 text-sm sm:text-base text-slate-800" style={{ overflowWrap: 'anywhere' }}>
           {loading ? (
             <div className="flex items-center justify-center gap-3 py-8">
